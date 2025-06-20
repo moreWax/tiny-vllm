@@ -2,7 +2,14 @@ use pyo3::prelude::*;
 use tiny_vllm_core::helpers;
 use tiny_vllm_core::{config, cuda_utils};
 use tiny_vllm_core::engine::parallel;
-
+use tiny_vllm_core::{config, cuda_utils, network};
+use pyo3::Bound;
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use tiny_vllm_core::helpers;
+use tiny_vllm_core::{config, cuda_utils};
+use tiny_vllm_core::layers::{activation::SiluAndMul as SiluCore, linear::Linear as LinearCore};
+use tiny_vllm_core::helpers;
+use tiny_vllm_core::{config, cuda_utils, model};
 
 fn to_py_err(err: anyhow::Error) -> PyErr {
     pyo3::exceptions::PyRuntimeError::new_err(err.to_string())
@@ -95,6 +102,51 @@ fn default_eos() -> i64 {
     config::settings::EOS
 }
 
+// ----- Simple network bindings -----
+#[pyclass]
+struct Network {
+    inner: network::Network,
+}
+
+#[pymethods]
+impl Network {
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: network::Network::new(),
+        }
+    }
+
+    fn add_identity_layer(&mut self) {
+        self.inner.add_layer(network::IdentityLayer);
+    }
+
+    fn forward(&self, input: Vec<f32>) -> Vec<f32> {
+        let tensor = network::Tensor::new(input);
+        let output = self.inner.forward(tensor);
+        output.data
+
+#[pyclass]
+struct Model {
+    inner: model::Model,
+}
+
+#[pymethods]
+impl Model {
+    #[new]
+    fn new(model: String) -> Self {
+        Self {
+            inner: model::Model::new(model),
+        }
+    }
+
+    #[getter]
+    fn model(&self) -> String {
+        self.inner.model().to_string()
+
+    }
+}
+
 #[pymodule]
 fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_device, m)?)?;
@@ -120,7 +172,15 @@ fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(default_kvcache_block_size, m)?)?;
     m.add_function(wrap_pyfunction!(default_num_kvcache_blocks, m)?)?;
     m.add_function(wrap_pyfunction!(default_eos, m)?)?;
-  
+
+
+    m.add_class::<Network>()?;
+
+    m.add_class::<LinearLayer>()?;
+    m.add_class::<SiluAndMul>()?;
+    m.add_class::<Model>()?;
+
+
     Ok(())
 }
 
@@ -139,3 +199,42 @@ fn chunked(lst: Vec<i64>, size: usize) -> PyResult<Vec<Vec<i64>>> {
     Ok(helpers::chunked(lst, size))
 }
 
+#[pyclass]
+struct LinearLayer {
+    inner: LinearCore,
+}
+
+#[pymethods]
+impl LinearLayer {
+    #[new]
+    fn new(weight: PyReadonlyArray2<f32>, bias: Option<PyReadonlyArray1<f32>>) -> Self {
+        let weight = weight.as_array().to_owned();
+        let bias = bias.map(|b| b.as_array().to_owned());
+        Self { inner: LinearCore::new(weight, bias) }
+    }
+
+    fn forward<'py>(&self, py: Python<'py>, x: PyReadonlyArray2<f32>) -> Bound<'py, PyArray2<f32>> {
+        let x = x.as_array().to_owned();
+        let y = self.inner.forward(&x);
+        y.into_pyarray_bound(py)
+    }
+}
+
+#[pyclass]
+struct SiluAndMul {
+    inner: SiluCore,
+}
+
+#[pymethods]
+impl SiluAndMul {
+    #[new]
+    fn new() -> Self {
+        Self { inner: SiluCore::default() }
+    }
+
+    fn forward<'py>(&self, py: Python<'py>, x: PyReadonlyArray2<f32>) -> Bound<'py, PyArray2<f32>> {
+        let x = x.as_array().to_owned();
+        let y = self.inner.forward(&x);
+        y.into_pyarray_bound(py)
+    }
+}

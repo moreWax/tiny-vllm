@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.22", features = ["extension-module"] }
 anyhow = "1"
 tiny-vllm-core = { path = "../tiny-vllm-core" }
+numpy = "0.22"
