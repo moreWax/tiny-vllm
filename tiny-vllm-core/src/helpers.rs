@@ -1,4 +1,3 @@
-use anyhow::Result;
 
 /// Clamp `value` to the inclusive range [min_value, max_value].
 pub fn clamp(value: i64, min_value: i64, max_value: i64) -> i64 {
