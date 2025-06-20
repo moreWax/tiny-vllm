@@ -1,7 +1,6 @@
 use pyo3::prelude::*;
-use tiny_vllm_core::cuda_utils;
+use tiny_vllm_core::{config, cuda_utils, model::layers};
 use tiny_vllm_core::helpers;
-use tiny_vllm_core::{config, cuda_utils};
 
 
 fn to_py_err(err: anyhow::Error) -> PyErr {
@@ -88,7 +87,12 @@ fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(default_kvcache_block_size, m)?)?;
     m.add_function(wrap_pyfunction!(default_num_kvcache_blocks, m)?)?;
     m.add_function(wrap_pyfunction!(default_eos, m)?)?;
-  
+
+    // layer classes
+    m.add_class::<LinearLayer>()?;
+    m.add_class::<SiluAndMul>()?;
+    m.add_class::<RMSNorm>()?;
+
     Ok(())
 }
 
@@ -105,5 +109,60 @@ fn flatten(list_of_lists: Vec<Vec<i64>>) -> PyResult<Vec<i64>> {
 #[pyfunction]
 fn chunked(lst: Vec<i64>, size: usize) -> PyResult<Vec<Vec<i64>>> {
     Ok(helpers::chunked(lst, size))
+}
+
+// ----- Layer wrappers -----
+
+#[pyclass]
+struct LinearLayer {
+    inner: layers::LinearLayer,
+}
+
+#[pymethods]
+impl LinearLayer {
+    #[new]
+    fn new(weight: Vec<Vec<f32>>, bias: Option<Vec<f32>>) -> Self {
+        Self {
+            inner: layers::LinearLayer::new(weight, bias),
+        }
+    }
+
+    fn forward(&self, x: Vec<Vec<f32>>) -> Vec<Vec<f32>> {
+        self.inner.forward(x)
+    }
+}
+
+#[pyclass]
+struct SiluAndMul {
+    inner: layers::SiluAndMul,
+}
+
+#[pymethods]
+impl SiluAndMul {
+    #[new]
+    fn new() -> Self {
+        Self { inner: layers::SiluAndMul::new() }
+    }
+
+    fn forward(&self, x: Vec<Vec<f32>>) -> Vec<Vec<f32>> {
+        self.inner.forward(x)
+    }
+}
+
+#[pyclass]
+struct RMSNorm {
+    inner: layers::RMSNorm,
+}
+
+#[pymethods]
+impl RMSNorm {
+    #[new]
+    fn new(hidden_size: usize, eps: f32) -> Self {
+        Self { inner: layers::RMSNorm::new(hidden_size, eps) }
+    }
+
+    fn forward(&self, x: Vec<Vec<f32>>) -> Vec<Vec<f32>> {
+        self.inner.forward(x)
+    }
 }
 
