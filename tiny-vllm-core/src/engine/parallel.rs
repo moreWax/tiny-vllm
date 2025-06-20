@@ -7,17 +7,22 @@
 
 use std::sync::{Mutex, OnceLock};
 
-#[derive(Debug, Default, Clone, Copy)]
-struct ParallelState {
-    world_size: usize,
-    rank: usize,
-    initialized: bool,
+use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+
+static WORLD_SIZE: OnceLock<AtomicUsize> = OnceLock::new();
+static RANK: OnceLock<AtomicUsize> = OnceLock::new();
+static INITIALIZED: OnceLock<AtomicBool> = OnceLock::new();
+
+fn world_size() -> &'static AtomicUsize {
+    WORLD_SIZE.get_or_init(|| AtomicUsize::new(1))
 }
 
-static STATE: OnceLock<Mutex<ParallelState>> = OnceLock::new();
+fn rank() -> &'static AtomicUsize {
+    RANK.get_or_init(|| AtomicUsize::new(0))
+}
 
-fn state() -> &'static Mutex<ParallelState> {
-    STATE.get_or_init(|| Mutex::new(ParallelState::default()))
+fn initialized() -> &'static AtomicBool {
+    INITIALIZED.get_or_init(|| AtomicBool::new(false))
 }
 
 /// Initialize the parallel runtime.
