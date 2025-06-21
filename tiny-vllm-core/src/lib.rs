@@ -5,4 +5,3 @@ pub mod model;
 pub mod engine;
 pub mod network;
 pub mod layers;
-pub mod model;

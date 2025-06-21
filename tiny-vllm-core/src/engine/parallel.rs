@@ -13,6 +13,19 @@ static WORLD_SIZE: OnceLock<AtomicUsize> = OnceLock::new();
 static RANK: OnceLock<AtomicUsize> = OnceLock::new();
 static INITIALIZED: OnceLock<AtomicBool> = OnceLock::new();
 
+#[derive(Default)]
+struct ParallelState {
+    world_size: usize,
+    rank: usize,
+    initialized: bool,
+}
+
+static STATE: OnceLock<Mutex<ParallelState>> = OnceLock::new();
+
+fn state() -> &'static Mutex<ParallelState> {
+    STATE.get_or_init(|| Mutex::new(ParallelState::default()))
+}
+
 fn world_size() -> &'static AtomicUsize {
     WORLD_SIZE.get_or_init(|| AtomicUsize::new(1))
 }
