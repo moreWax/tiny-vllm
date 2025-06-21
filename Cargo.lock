@@ -228,7 +228,11 @@ dependencies = [
  "proc-macro2",
 ]
 
-[[package]]
+[[package]
+name = "ryu"
+version = "1.0.20"
+
+
 name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -311,6 +315,7 @@ name = "tiny-vllm-py"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ndarray",
  "numpy",
  "pyo3",
  "tiny-vllm-core",
