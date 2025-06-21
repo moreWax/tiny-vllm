@@ -36,7 +36,3 @@ mod tests {
         assert_eq!(m.config.model, "test-model".to_string());
     }
 }
-
-pub mod types;
-
-pub use types::Model;
