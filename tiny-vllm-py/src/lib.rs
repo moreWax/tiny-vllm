@@ -1,4 +1,7 @@
 use pyo3::prelude::*;
+use tiny_vllm_core::cuda_utils;
+use tiny_vllm_core::helpers;
+use tiny_vllm_core::{config, cuda_utils};
 
 use pyo3::Bound;
 use numpy::{PyReadonlyArray2, PyReadonlyArray1, PyArray2, IntoPyArray};
@@ -27,7 +30,6 @@ use tiny_vllm_core::helpers;
 use tiny_vllm_core::{config, cuda_utils};
 
 use tiny_vllm_core::layers::{activation::SiluAndMul as SiluCore, linear::Linear as LinearCore};
-
 
 fn to_py_err(err: anyhow::Error) -> PyErr {
     pyo3::exceptions::PyRuntimeError::new_err(err.to_string())
@@ -302,6 +304,52 @@ fn chunked(lst: Vec<i64>, size: usize) -> PyResult<Vec<Vec<i64>>> {
     Ok(helpers::chunked(lst, size))
 }
 
+// ----- Default settings helpers -----
+#[pyfunction]
+fn default_max_num_batched_tokens() -> usize {
+    config::settings::MAX_NUM_BATCHED_TOKENS
+}
+
+#[pyfunction]
+fn default_max_num_seqs() -> usize {
+    config::settings::MAX_NUM_SEQS
+}
+
+#[pyfunction]
+fn default_max_model_len() -> usize {
+    config::settings::MAX_MODEL_LEN
+}
+
+#[pyfunction]
+fn default_gpu_memory_utilization() -> f32 {
+    config::settings::GPU_MEMORY_UTILIZATION
+}
+
+#[pyfunction]
+fn default_tensor_parallel_size() -> usize {
+    config::settings::TENSOR_PARALLEL_SIZE
+}
+
+#[pyfunction]
+fn default_enforce_eager() -> bool {
+    config::settings::ENFORCE_EAGER
+}
+
+#[pyfunction]
+fn default_kvcache_block_size() -> usize {
+    config::settings::KVCACHE_BLOCK_SIZE
+}
+
+#[pyfunction]
+fn default_num_kvcache_blocks() -> isize {
+    config::settings::NUM_KVCACHE_BLOCKS
+}
+
+#[pyfunction]
+fn default_eos() -> i64 {
+    config::settings::EOS
+}
+
 #[pymodule]
 fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_device, m)?)?;
@@ -310,11 +358,14 @@ fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(clamp, m)?)?;
     m.add_function(wrap_pyfunction!(flatten, m)?)?;
     m.add_function(wrap_pyfunction!(chunked, m)?)?;
+
+    // default setting helpers
     m.add_function(wrap_pyfunction!(init_process_group, m)?)?;
     m.add_function(wrap_pyfunction!(destroy_process_group, m)?)?;
     m.add_function(wrap_pyfunction!(get_rank, m)?)?;
     m.add_function(wrap_pyfunction!(get_world_size, m)?)?;
     m.add_function(wrap_pyfunction!(barrier, m)?)?;
+
     m.add_function(wrap_pyfunction!(default_max_num_batched_tokens, m)?)?;
     m.add_function(wrap_pyfunction!(default_max_num_seqs, m)?)?;
     m.add_function(wrap_pyfunction!(default_max_model_len, m)?)?;
@@ -331,5 +382,22 @@ fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Session>()?;
 
     m.add_class::<Model>()?;
+
     Ok(())
 }
+
+#[pyfunction]
+fn clamp(value: i64, min_value: i64, max_value: i64) -> PyResult<i64> {
+    Ok(helpers::clamp(value, min_value, max_value))
+}
+
+#[pyfunction]
+fn flatten(list_of_lists: Vec<Vec<i64>>) -> PyResult<Vec<i64>> {
+    Ok(helpers::flatten(list_of_lists))
+}
+
+#[pyfunction]
+fn chunked(lst: Vec<i64>, size: usize) -> PyResult<Vec<Vec<i64>>> {
+    Ok(helpers::chunked(lst, size))
+}
+

@@ -7,6 +7,31 @@ xxhash
 nvidia-ml-py3>=7.352.0
 ninja>=1.11.0
 
+# HuggingFace ecosystem
+huggingface-hub>=0.33.0
+tokenizers>=0.21.0
+safetensors>=0.5.0
+
+# Web/API framework dependencies
+fastapi>=0.115.0
+uvicorn>=0.34.0
+starlette>=0.46.0
+
+# HTTP client libraries
+aiohttp>=3.12.0
+httpx>=0.28.0
+requests>=2.32.0
+
+# AI/ML service dependencies
+openai>=1.88.0
+litellm>=1.72.0
+tiktoken>=0.9.0
+
+# Data validation and utilities
+pydantic>=2.11.0
+python-dotenv>=1.1.0
+click>=8.2.0
+
 # Optional GPU dependencies (uncomment if you have CUDA)
 # triton>=3.0.0
 # flash-attn

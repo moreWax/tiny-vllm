@@ -34,9 +34,18 @@ print(outputs[0]["text"])
 - [CONTRIBUTING.md](CONTRIBUTING.md) describes the workflow for porting epochs.
 - [docs/porting_plan.md](docs/porting_plan.md) tracks the detailed file-by-file plan.
 
+
 ## Benchmark
 
 See `bench.py` for the original benchmark setup. Preliminary results on a RTX 4070 running the Python engine show:
+
+**Test Configuration:**
+- Hardware: RTX 4070 Laptop (8GB)
+- Model: Qwen3-0.6B
+- Total Requests: 256 sequences
+- Input Length: Randomly sampled between 100–1024 tokens
+- Output Length: Randomly sampled between 100–1024 tokens
+
 
 | Inference Engine | Output Tokens | Time (s) | Throughput (tokens/s) |
 |----------------|-------------|----------|-----------------------|
@@ -44,3 +53,5 @@ See `bench.py` for the original benchmark setup. Preliminary results on a RTX 40
 | Nano-vLLM      | 133,966     | 101.90   | 1314.65               |
 
 We will add Rust benchmark numbers in [BENCHMARKS.md](BENCHMARKS.md) as the port progresses.
+| vLLM           | 133,966     | 98.37    | 1361.84               |
+| Nano-vLLM      | 133,966     | 93.41    | 1434.13               |
