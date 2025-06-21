@@ -177,7 +177,7 @@ where
     drop(tx);
     drop(pool); // wait for workers
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(inputs.len());
     for pair in rx.iter() {
         results.push(pair);
     }
