@@ -1,9 +1,12 @@
-//! Stubbed parallel execution utilities.
+//! Parallel execution utilities.
 //!
-//! This module provides minimal implementations of the parallel primitives
-//! used throughout the engine. The real implementation will provide true
-//! distributed execution backed by CUDA/NCCL. For now we simply maintain the
-//! world size and rank in-process and perform no communication.
+//! The initial version of this crate only provided stub functions so the rest
+//! of the engine could compile.  This file now contains a very small thread
+//! pool implementation used by the inference engine.  It is **not** a drop-in
+//! replacement for the distributed setup of the original project, but it allows
+//! running model computations on multiple threads within a single process.  The
+//! process group APIs remain available and simply track the world size and rank
+//! for now.
 
 use std::sync::{Mutex, OnceLock};
 
@@ -88,6 +91,118 @@ pub fn gather<T: Clone>(input: &T, output: Option<&mut Vec<T>>, root: usize) {
         if let Some(out) = output {
             out.push(input.clone());
         }
+    }
+}
+
+// ----- Thread pool implementation -----
+
+use std::sync::{mpsc, Arc};
+use std::thread;
+
+type Job = Box<dyn FnOnce() + Send + 'static>;
+
+enum Message {
+    Job(Job),
+    Terminate,
+}
+
+/// Simple thread pool for executing jobs in parallel.
+pub struct ThreadPool {
+    sender: mpsc::Sender<Message>,
+    workers: Vec<thread::JoinHandle<()>>, 
+}
+
+impl ThreadPool {
+    /// Create a new thread pool with `size` worker threads.
+    pub fn new(size: usize) -> Self {
+        assert!(size > 0);
+        let (tx, rx) = mpsc::channel::<Message>();
+        let rx = Arc::new(Mutex::new(rx));
+        let mut workers = Vec::with_capacity(size);
+        for _ in 0..size {
+            let r = Arc::clone(&rx);
+            workers.push(thread::spawn(move || loop {
+                let msg = { r.lock().unwrap().recv().unwrap() };
+                match msg {
+                    Message::Job(job) => job(),
+                    Message::Terminate => break,
+                }
+            }));
+        }
+        Self { sender: tx, workers }
+    }
+
+    /// Execute a function on the thread pool.
+    pub fn execute<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.sender.send(Message::Job(Box::new(f))).unwrap();
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        for _ in &self.workers {
+            let _ = self.sender.send(Message::Terminate);
+        }
+        for h in self.workers.drain(..) {
+            let _ = h.join();
+        }
+    }
+}
+
+/// Apply `func` to each item in `inputs` using up to `num_threads` threads.
+pub fn parallel_map<I, O, F>(inputs: Vec<I>, func: F, num_threads: usize) -> Vec<O>
+where
+    I: Send + 'static,
+    O: Send + 'static,
+    F: Fn(I) -> O + Send + Sync + 'static,
+{
+    if num_threads <= 1 || inputs.len() <= 1 {
+        return inputs.into_iter().map(func).collect();
+    }
+
+    let pool = ThreadPool::new(num_threads);
+    let func = Arc::new(func);
+    let (tx, rx) = mpsc::channel();
+    for (idx, item) in inputs.into_iter().enumerate() {
+        let tx = tx.clone();
+        let f = Arc::clone(&func);
+        pool.execute(move || {
+            let out = f(item);
+            tx.send((idx, out)).unwrap();
+        });
+    }
+    drop(tx);
+    drop(pool); // wait for workers
+
+    let mut results = Vec::new();
+    for pair in rx.iter() {
+        results.push(pair);
+    }
+    results.sort_by_key(|(idx, _)| *idx);
+    results.into_iter().map(|(_, v)| v).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_group_state() {
+        destroy_process_group();
+        init_process_group(4, 1);
+        assert_eq!(get_world_size(), 4);
+        assert_eq!(get_rank(), 1);
+        destroy_process_group();
+    }
+
+    #[test]
+    fn test_parallel_map() {
+        let input = vec![1, 2, 3, 4];
+        let result = parallel_map(input, |v| v * v, 2);
+        assert_eq!(result, vec![1, 4, 9, 16]);
     }
 }
 
