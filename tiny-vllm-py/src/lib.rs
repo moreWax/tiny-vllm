@@ -5,6 +5,19 @@ use ndarray::{Array1, Array2};
 use tiny_vllm_core::{config, cuda_utils, helpers, network};
 use tiny_vllm_core::engine::{parallel, session as session_core};
 use tiny_vllm_core::model::{self, layers};
+
+use tiny_vllm_core::{config, cuda_utils, model::layers};
+use tiny_vllm_core::engine;
+use tiny_vllm_core::helpers;
+use tiny_vllm_core::helpers;
+use tiny_vllm_core::{config, cuda_utils};
+use tiny_vllm_core::engine::parallel;
+use tiny_vllm_core::{config, cuda_utils, network};
+use pyo3::Bound;
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use tiny_vllm_core::helpers;
+use tiny_vllm_core::{config, cuda_utils};
+
 use tiny_vllm_core::layers::{activation::SiluAndMul as SiluCore, linear::Linear as LinearCore};
 
 fn to_py_err(err: anyhow::Error) -> PyErr {
@@ -93,6 +106,26 @@ impl NetworkWrapper {
     }
 }
 
+#[pyclass]
+struct Engine {
+    inner: engine::Engine,
+}
+
+#[pymethods]
+impl Engine {
+    #[new]
+    fn new(num_threads: Option<usize>) -> Self {
+        let threads = num_threads.unwrap_or(1);
+        Self { inner: engine::Engine::new(threads) }
+    }
+
+    #[getter]
+    fn num_threads(&self) -> usize {
+        self.inner.num_threads()
+    }
+}
+
+
 // ----- Model wrapper -----
 #[pyclass]
 struct Model {
@@ -114,10 +147,14 @@ struct Session {
     inner: session_core::Session,
 }
 
+
 #[pymethods]
 impl Session {
     #[new]
     fn new(model: String) -> Self { Self { inner: session_core::Session::new(model) } }
+    m.add_class::<Network>()?;
+    m.add_class::<Engine>()?;
+
 
     #[getter]
     fn id(&self) -> u64 { self.inner.id() }
