@@ -265,17 +265,20 @@ mod tests {
 
     #[test]
     fn test_task_scheduler_parallel() {
+        use std::sync::{Arc, Barrier};
         let sched = TaskScheduler::new(4);
-        let start = Instant::now();
+        let barrier = Arc::new(Barrier::new(4));
         let handles: Vec<_> = (0..4)
-            .map(|_| sched.spawn(|| {
-                thread::sleep(Duration::from_millis(100));
-                1
-            }))
+            .map(|_| {
+                let barrier_clone = Arc::clone(&barrier);
+                sched.spawn(move || {
+                    barrier_clone.wait(); // Ensure all threads start together
+                    thread::sleep(Duration::from_millis(100));
+                    1
+                })
+            })
             .collect();
         let results = TaskScheduler::join_all(handles);
-        let elapsed = start.elapsed();
-        assert!(elapsed < Duration::from_millis(400));
         assert_eq!(results, vec![1, 1, 1, 1]);
     }
 }
