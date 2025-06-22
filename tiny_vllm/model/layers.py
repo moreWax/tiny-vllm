@@ -1,10 +1,8 @@
 from __future__ import annotations
-from tiny_vllm_py import LinearLayer as _LinearLayer, SiluAndMul as _SiluAndMul, RMSNorm as _RMSNorm
+import tiny_vllm_py
 
-LinearLayer = _LinearLayer
-SiluAndMul = _SiluAndMul
-RMSNorm = _RMSNorm
+LinearLayer = tiny_vllm_py.LinearLayer
+SiluAndMul = tiny_vllm_py.SiluAndMul
+RMSNorm = tiny_vllm_py.RMSNorm
 
-from tiny_vllm_py import LinearLayer, SiluAndMul
-
-__all__ = ["LinearLayer", "SiluAndMul"]
+__all__ = ["LinearLayer", "SiluAndMul", "RMSNorm"]

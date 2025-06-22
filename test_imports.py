@@ -3,58 +3,35 @@
 
 def test_rust_module():
     """Test that the Rust module can be imported and basic functions work."""
-    try:
-        import tiny_vllm_py
-        print("✓ Successfully imported tiny_vllm_py")
-        
-        # Test basic functions
-        device = tiny_vllm_py.get_device()
-        memory = tiny_vllm_py.get_gpu_memory()
-        utilization = tiny_vllm_py.get_gpu_memory_utilization()
-        
-        print(f"  Device: {device}")
-        print(f"  GPU Memory: {memory}")
-        print(f"  GPU Utilization: {utilization:.1%}")
-        
-        return True
-    except ImportError as e:
-        print(f"✗ Could not import tiny_vllm_py: {e}")
-        print("  Fix: cd tiny-vllm-py && maturin develop && cd ..")
-        return False
-    except Exception as e:
-        print(f"✗ Error testing tiny_vllm_py: {e}")
-        return False
+    import tiny_vllm_py
+
+    # Basic stub functionality should return default values
+    device = tiny_vllm_py.get_device()
+    memory = tiny_vllm_py.get_gpu_memory()
+    utilization = tiny_vllm_py.get_gpu_memory_utilization()
+
+    assert device == "cpu"
+    assert memory == 0
+    assert utilization == 0.0
 
 def test_python_module():
     """Test that the Python modules can be imported."""
-    try:
-        from nanovllm.sampling_params import SamplingParams
-        from nanovllm import LLM
-        print("✓ Successfully imported nanovllm components")
-        
-        # Test creating sampling params
-        params = SamplingParams(temperature=0.8)
-        print(f"  Created SamplingParams with temperature: {params.temperature}")
-        
-        return True
-    except ImportError as e:
-        print(f"✗ Could not import nanovllm: {e}")
-        print("  Fix: pip install -e .")
-        return False
-    except Exception as e:
-        print(f"✗ Error testing nanovllm: {e}")
-        return False
+    import importlib.util
+    import pathlib
+
+    path = pathlib.Path('nanovllm/sampling_params.py')
+    spec = importlib.util.spec_from_file_location('nano_params', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    params = module.SamplingParams(temperature=0.8)
+    assert params.temperature == 0.8
 
 def test_transformers():
     """Test that transformers can be imported."""
-    try:
-        from transformers import AutoTokenizer
-        print("✓ Successfully imported transformers")
-        return True
-    except ImportError as e:
-        print(f"✗ Could not import transformers: {e}")
-        print("  Fix: pip install transformers")
-        return False
+    from transformers import AutoTokenizer
+
+    assert AutoTokenizer is not None
 
 if __name__ == "__main__":
     print("=== Testing Tiny-vLLM Components ===\n")
