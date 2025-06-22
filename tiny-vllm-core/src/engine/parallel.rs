@@ -284,20 +284,24 @@ impl InferenceHandle {
 }
 
 /// Thread-safe queue processing inference requests using a fixed set of workers.
+use crate::model::Model;
+
 pub struct InferenceQueue {
     sender: mpsc::Sender<(InferenceRequest, mpsc::Sender<String>)>,
     workers: Vec<thread::JoinHandle<()>>,
+    model: Arc<Model>,
 }
 
 impl InferenceQueue {
     /// Create a new queue with `num_workers` worker threads.
-    pub fn new(num_workers: usize) -> Self {
+    pub fn new(num_workers: usize, model: Arc<Model>) -> Self {
         assert!(num_workers > 0);
         let (tx, rx) = mpsc::channel::<(InferenceRequest, mpsc::Sender<String>)>();
         let rx = Arc::new(Mutex::new(rx));
         let mut workers = Vec::with_capacity(num_workers);
         for _ in 0..num_workers {
             let r = Arc::clone(&rx);
+            let model_clone = Arc::clone(&model);
             workers.push(thread::spawn(move || loop {
                 let (req, result_tx) = match r.lock().unwrap().recv() {
                     Ok(v) => v,
@@ -307,12 +311,11 @@ impl InferenceQueue {
                     let _ = result_tx.send(String::new());
                     continue;
                 }
-                // Placeholder for real model execution.
-                let out = format!("processed: {}", req.prompt());
+                let out = model_clone.generate(req.prompt());
                 let _ = result_tx.send(out);
             }));
         }
-        Self { sender: tx, workers }
+        Self { sender: tx, workers, model }
     }
 
     /// Submit a prompt to the queue and obtain a handle to await the result.
@@ -343,6 +346,7 @@ mod tests {
     use super::*;
     use std::time::Duration;
     use std::thread;
+    use std::sync::Arc;
 
     #[test]
     fn test_process_group_state() {
@@ -389,7 +393,8 @@ mod tests {
 
     #[test]
     fn test_inference_queue_basic() {
-        let queue = InferenceQueue::new(2);
+        let model = Arc::new(crate::model::Model::new("dummy".to_string()));
+        let queue = InferenceQueue::new(2, Arc::clone(&model));
         let handles: Vec<_> = (0..5)
             .map(|i| queue.submit(format!("req{}", i)))
             .collect();
@@ -399,14 +404,15 @@ mod tests {
             .collect();
         results.sort();
         let expected: Vec<_> = (0..5)
-            .map(|i| format!("processed: req{}", i))
+            .map(|i| format!("dummy: req{}", i))
             .collect();
         assert_eq!(results, expected);
     }
 
     #[test]
     fn test_inference_queue_cancel() {
-        let queue = InferenceQueue::new(1);
+        let model = Arc::new(crate::model::Model::new("dummy".to_string()));
+        let queue = InferenceQueue::new(1, Arc::clone(&model));
         let handle = queue.submit("slow".to_string());
         handle.cancel();
         let result = handle.wait().unwrap();

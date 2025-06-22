@@ -23,6 +23,16 @@ impl Model {
     pub fn model(&self) -> &str {
         &self.config.model
     }
+
+    /// Generate a completion for the provided prompt.
+    ///
+    /// This is a very small stand-in for the real model forward pass. It
+    /// simply echoes the prompt prefixed by the model identifier. The goal is
+    /// to exercise the scheduling and session code while the heavy weight
+    /// model integration is developed.
+    pub fn generate(&self, prompt: &str) -> String {
+        format!("{}: {}", self.model(), prompt)
+    }
 }
 
 #[cfg(test)]
