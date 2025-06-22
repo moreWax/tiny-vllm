@@ -293,6 +293,10 @@ impl Model {
     fn model(&self) -> String {
         self.inner.model().to_string()
     }
+
+    fn generate(&self, prompt: &str) -> String {
+        self.inner.generate(prompt)
+    }
 }
 
 // ----- Session wrapper -----
