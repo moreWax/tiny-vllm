@@ -98,6 +98,7 @@ pub fn gather<T: Clone>(input: &T, output: Option<&mut Vec<T>>, root: usize) {
 
 use std::sync::{mpsc, Arc};
 use std::thread;
+use std::time::Duration;
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
@@ -152,6 +153,52 @@ impl Drop for ThreadPool {
     }
 }
 
+// ----- Task scheduler built on top of the thread pool -----
+
+/// Handle returned when a task is scheduled. The result can be obtained using
+/// [`TaskHandle::join`].
+pub struct TaskHandle<R> {
+    receiver: mpsc::Receiver<R>,
+}
+
+impl<R> TaskHandle<R> {
+    /// Wait for the task to complete and return its result.
+    pub fn join(self) -> R {
+        self.receiver.recv().unwrap()
+    }
+}
+
+/// Simple scheduler that dispatches work to a [`ThreadPool`].
+pub struct TaskScheduler {
+    pool: ThreadPool,
+}
+
+impl TaskScheduler {
+    /// Create a scheduler backed by `num_threads` workers.
+    pub fn new(num_threads: usize) -> Self {
+        Self { pool: ThreadPool::new(num_threads.max(1)) }
+    }
+
+    /// Spawn a task returning a [`TaskHandle`].
+    pub fn spawn<F, R>(&self, f: F) -> TaskHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let (tx, rx) = mpsc::channel();
+        self.pool.execute(move || {
+            let res = f();
+            let _ = tx.send(res);
+        });
+        TaskHandle { receiver: rx }
+    }
+
+    /// Convenience helper to wait for multiple tasks.
+    pub fn join_all<R>(handles: Vec<TaskHandle<R>>) -> Vec<R> {
+        handles.into_iter().map(|h| h.join()).collect()
+    }
+}
+
 /// Apply `func` to each item in `inputs` using up to `num_threads` threads.
 pub fn parallel_map<I, O, F>(inputs: Vec<I>, func: F, num_threads: usize) -> Vec<O>
 where
@@ -165,6 +212,7 @@ where
 
     let pool = ThreadPool::new(num_threads);
     let func = Arc::new(func);
+    let len = inputs.len();
     let (tx, rx) = mpsc::channel();
     for (idx, item) in inputs.into_iter().enumerate() {
         let tx = tx.clone();
@@ -177,7 +225,7 @@ where
     drop(tx);
     drop(pool); // wait for workers
 
-    let mut results = Vec::with_capacity(inputs.len());
+    let mut results = Vec::with_capacity(len);
     for pair in rx.iter() {
         results.push(pair);
     }
@@ -188,6 +236,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, Instant};
+    use std::thread;
 
     #[test]
     fn test_process_group_state() {
@@ -203,6 +253,30 @@ mod tests {
         let input = vec![1, 2, 3, 4];
         let result = parallel_map(input, |v| v * v, 2);
         assert_eq!(result, vec![1, 4, 9, 16]);
+    }
+
+    #[test]
+    fn test_task_scheduler_basic() {
+        let sched = TaskScheduler::new(2);
+        let handles: Vec<_> = (0..4).map(|i| sched.spawn(move || i * 2)).collect();
+        let results = TaskScheduler::join_all(handles);
+        assert_eq!(results, vec![0, 2, 4, 6]);
+    }
+
+    #[test]
+    fn test_task_scheduler_parallel() {
+        let sched = TaskScheduler::new(4);
+        let start = Instant::now();
+        let handles: Vec<_> = (0..4)
+            .map(|_| sched.spawn(|| {
+                thread::sleep(Duration::from_millis(100));
+                1
+            }))
+            .collect();
+        let results = TaskScheduler::join_all(handles);
+        let elapsed = start.elapsed();
+        assert!(elapsed < Duration::from_millis(400));
+        assert_eq!(results, vec![1, 1, 1, 1]);
     }
 }
 
