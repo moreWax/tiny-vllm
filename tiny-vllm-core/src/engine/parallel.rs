@@ -10,7 +10,7 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use std::sync::atomic::{AtomicUsize, AtomicBool};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 static WORLD_SIZE: OnceLock<AtomicUsize> = OnceLock::new();
 static RANK: OnceLock<AtomicUsize> = OnceLock::new();
@@ -62,13 +62,21 @@ pub fn destroy_process_group() {
 /// Return the world size of the current process group.
 pub fn get_world_size() -> usize {
     let s = state().lock().unwrap();
-    if s.initialized { s.world_size } else { 1 }
+    if s.initialized {
+        s.world_size
+    } else {
+        1
+    }
 }
 
 /// Return the rank of the current process within the process group.
 pub fn get_rank() -> usize {
     let s = state().lock().unwrap();
-    if s.initialized { s.rank } else { 0 }
+    if s.initialized {
+        s.rank
+    } else {
+        0
+    }
 }
 
 /// Synchronize all processes. In the stub this is a no-op.
@@ -96,10 +104,10 @@ pub fn gather<T: Clone>(input: &T, output: Option<&mut Vec<T>>, root: usize) {
 
 // ----- Thread pool implementation -----
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
@@ -111,7 +119,7 @@ enum Message {
 /// Simple thread pool for executing jobs in parallel.
 pub struct ThreadPool {
     sender: mpsc::Sender<Message>,
-    workers: Vec<thread::JoinHandle<()>>, 
+    workers: Vec<thread::JoinHandle<()>>,
 }
 
 impl ThreadPool {
@@ -131,7 +139,10 @@ impl ThreadPool {
                 }
             }));
         }
-        Self { sender: tx, workers }
+        Self {
+            sender: tx,
+            workers,
+        }
     }
 
     /// Execute a function on the thread pool.
@@ -177,7 +188,9 @@ pub struct TaskScheduler {
 impl TaskScheduler {
     /// Create a scheduler backed by `num_threads` workers.
     pub fn new(num_threads: usize) -> Self {
-        Self { pool: ThreadPool::new(num_threads.max(1)) }
+        Self {
+            pool: ThreadPool::new(num_threads.max(1)),
+        }
     }
 
     /// Spawn a task returning a [`TaskHandle`].
@@ -249,20 +262,32 @@ impl InferenceRequest {
     pub fn new(prompt: String) -> Self {
         static NEXT_ID: AtomicU64 = AtomicU64::new(1);
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
-        Self { id, prompt, cancelled: Arc::new(AtomicBool::new(false)) }
+        Self {
+            id,
+            prompt,
+            cancelled: Arc::new(AtomicBool::new(false)),
+        }
     }
 
     /// Unique identifier for the request.
-    pub fn id(&self) -> u64 { self.id }
+    pub fn id(&self) -> u64 {
+        self.id
+    }
 
     /// Reference to the request prompt.
-    pub fn prompt(&self) -> &str { &self.prompt }
+    pub fn prompt(&self) -> &str {
+        &self.prompt
+    }
 
     /// Cancel the request.
-    pub fn cancel(&self) { self.cancelled.store(true, Ordering::SeqCst); }
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
 
     /// Whether the request has been cancelled.
-    pub fn is_cancelled(&self) -> bool { self.cancelled.load(Ordering::SeqCst) }
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
 }
 
 /// Handle returned to the caller for a queued request.
@@ -274,30 +299,40 @@ pub struct InferenceHandle {
 
 impl InferenceHandle {
     /// Cancel the underlying request.
-    pub fn cancel(&self) { self.cancel_flag.store(true, Ordering::SeqCst); }
+    pub fn cancel(&self) {
+        self.cancel_flag.store(true, Ordering::SeqCst);
+    }
 
     /// Wait for the request to finish and return the result.
-    pub fn wait(self) -> Option<String> { self.receiver.recv().ok() }
+    pub fn wait(self) -> Option<String> {
+        self.receiver.recv().ok()
+    }
 
     /// Identifier of the request.
-    pub fn id(&self) -> u64 { self.id }
+    pub fn id(&self) -> u64 {
+        self.id
+    }
 }
 
 /// Thread-safe queue processing inference requests using a fixed set of workers.
+use crate::model::Model;
+
 pub struct InferenceQueue {
     sender: mpsc::Sender<(InferenceRequest, mpsc::Sender<String>)>,
     workers: Vec<thread::JoinHandle<()>>,
+    model: Arc<Model>,
 }
 
 impl InferenceQueue {
     /// Create a new queue with `num_workers` worker threads.
-    pub fn new(num_workers: usize) -> Self {
+    pub fn new(num_workers: usize, model: Arc<Model>) -> Self {
         assert!(num_workers > 0);
         let (tx, rx) = mpsc::channel::<(InferenceRequest, mpsc::Sender<String>)>();
         let rx = Arc::new(Mutex::new(rx));
         let mut workers = Vec::with_capacity(num_workers);
         for _ in 0..num_workers {
             let r = Arc::clone(&rx);
+            let model_clone = Arc::clone(&model);
             workers.push(thread::spawn(move || loop {
                 let (req, result_tx) = match r.lock().unwrap().recv() {
                     Ok(v) => v,
@@ -307,12 +342,15 @@ impl InferenceQueue {
                     let _ = result_tx.send(String::new());
                     continue;
                 }
-                // Placeholder for real model execution.
-                let out = format!("processed: {}", req.prompt());
+                let out = model_clone.generate(req.prompt());
                 let _ = result_tx.send(out);
             }));
         }
-        Self { sender: tx, workers }
+        Self {
+            sender: tx,
+            workers,
+            model,
+        }
     }
 
     /// Submit a prompt to the queue and obtain a handle to await the result.
@@ -322,7 +360,11 @@ impl InferenceQueue {
         let cancel_flag = req.cancelled.clone();
         let (tx, rx) = mpsc::channel();
         self.sender.send((req, tx)).unwrap();
-        InferenceHandle { id: req_id, receiver: rx, cancel_flag }
+        InferenceHandle {
+            id: req_id,
+            receiver: rx,
+            cancel_flag,
+        }
     }
 }
 
@@ -341,8 +383,9 @@ impl Drop for InferenceQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use std::sync::Arc;
     use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_process_group_state() {
@@ -389,28 +432,28 @@ mod tests {
 
     #[test]
     fn test_inference_queue_basic() {
-        let queue = InferenceQueue::new(2);
-        let handles: Vec<_> = (0..5)
-            .map(|i| queue.submit(format!("req{}", i)))
-            .collect();
-        let mut results: Vec<_> = handles
-            .into_iter()
-            .map(|h| h.wait().unwrap())
-            .collect();
+        let model = Arc::new(crate::model::Model::new("dummy".to_string()));
+        let queue = InferenceQueue::new(2, Arc::clone(&model));
+        let handles: Vec<_> = (0..5).map(|i| queue.submit(format!("req{}", i))).collect();
+        let mut results: Vec<_> = handles.into_iter().map(|h| h.wait().unwrap()).collect();
         results.sort();
-        let expected: Vec<_> = (0..5)
-            .map(|i| format!("processed: req{}", i))
-            .collect();
+        let expected = vec![
+            "dummy: 0.717565".to_string(),
+            "dummy: 0.723292".to_string(),
+            "dummy: 0.729033".to_string(),
+            "dummy: 0.734785".to_string(),
+            "dummy: 0.740554".to_string(),
+        ];
         assert_eq!(results, expected);
     }
 
     #[test]
     fn test_inference_queue_cancel() {
-        let queue = InferenceQueue::new(1);
+        let model = Arc::new(crate::model::Model::new("dummy".to_string()));
+        let queue = InferenceQueue::new(1, Arc::clone(&model));
         let handle = queue.submit("slow".to_string());
         handle.cancel();
         let result = handle.wait().unwrap();
         assert!(result.is_empty());
     }
 }
-

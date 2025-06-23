@@ -94,6 +94,29 @@ class Model:
     def __init__(self, model: str):
         self.model = model
 
+        # Small neural network matching the Rust implementation
+        self.fc1 = LinearLayer(
+            [
+                [0.03, 0.04],
+                [0.05, 0.06],
+                [0.07, 0.08],
+                [0.09, 0.10],
+            ],
+            bias=[0.0, 0.0, 0.0, 0.0],
+        )
+        self.act = SiluAndMul()
+        self.fc2 = LinearLayer([[0.5, -0.25]], bias=[0.1])
+
+    def generate(self, prompt: str) -> str:
+        length = float(len(prompt))
+        avg = sum(ord(c) for c in prompt) / length if length > 0 else 0.0
+        x = [[length, avg]]
+        x = self.fc1.forward(x)
+        x = self.act.forward(x)
+        x = self.fc2.forward(x)
+        val = float(x[0][0])
+        return f"{self.model}: {val:.6f}"
+
 
 class Engine:
     def __init__(self, num_threads: int = 1):
