@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use tiny_vllm_core::cuda_utils;
-use tiny_vllm_core::helpers;
+use tiny_vllm_core::utils::helpers;
 use tiny_vllm_core::{config, cuda_utils};
 
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
@@ -10,22 +10,20 @@ use tiny_vllm_core::model::layers::{
     LinearLayer as LinearCore, RMSNorm as RMSNormCore, SiluAndMul as SiluCore,
 };
 use tiny_vllm_core::model::Model as CoreModel;
-use tiny_vllm_core::{config, cuda_utils, engine::parallel, helpers, network};
+use tiny_vllm_core::{config, cuda_utils, engine::parallel, network};
 
 use ndarray::{Array1, Array2};
 use numpy::{IntoPyArray, PyArray2};
 
 use tiny_vllm_core::engine::{parallel, session as session_core};
 use tiny_vllm_core::model::{self, layers};
-use tiny_vllm_core::{config, cuda_utils, helpers, network};
+use tiny_vllm_core::{config, cuda_utils, network};
 
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::Bound;
 use tiny_vllm_core::engine;
 use tiny_vllm_core::engine::parallel;
-use tiny_vllm_core::helpers;
-use tiny_vllm_core::helpers;
-use tiny_vllm_core::helpers;
+use tiny_vllm_core::utils::helpers;
 use tiny_vllm_core::{config, cuda_utils};
 use tiny_vllm_core::{config, cuda_utils};
 use tiny_vllm_core::{config, cuda_utils, model::layers};
