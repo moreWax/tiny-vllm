@@ -21,56 +21,13 @@ pub fn compute_hash(token_ids: &[i64], prefix: Option<u64>) -> u64 {
     hasher.digest()
 }
 
-/// Minimal sequence representation storing token IDs and block allocation info.
-#[derive(Debug)]
-pub struct Sequence {
-    pub token_ids: Vec<i64>,
-    pub num_cached_tokens: usize,
-    pub block_table: Vec<usize>,
-    pub block_size: usize,
-}
-
-impl Sequence {
-    pub fn new(token_ids: Vec<i64>, block_size: usize) -> Self {
-        Self {
-            token_ids,
-            num_cached_tokens: 0,
-            block_table: Vec::new(),
-            block_size,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.token_ids.len()
-    }
-
-    pub fn num_blocks(&self) -> usize {
-        (self.len() + self.block_size - 1) / self.block_size
-    }
-
-    pub fn block(&self, i: usize) -> Vec<i64> {
-        let start = i * self.block_size;
-        let end = usize::min(start + self.block_size, self.len());
-        self.token_ids[start..end].to_vec()
-    }
-
-    /// Borrow a block without allocation.
-    pub fn block_slice(&self, i: usize) -> &[i64] {
-        let start = i * self.block_size;
-        let end = usize::min(start + self.block_size, self.len());
-        &self.token_ids[start..end]
-    }
-
-    /// Iterate over blocks as slices.
-    pub fn blocks(&self) -> impl Iterator<Item = &[i64]> {
-        self.token_ids.chunks(self.block_size)
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::block_manager::BlockManager;
+    use crate::engine::sequence::Sequence;
+    use crate::sampling_params::SamplingParams;
 
     #[test]
     fn test_compute_hash() {
@@ -81,7 +38,7 @@ mod tests {
 
     #[test]
     fn test_allocate_and_deallocate() {
-        let mut seq = Sequence::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9], 4);
+        let mut seq = Sequence::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9], SamplingParams::default());
         let mut manager = BlockManager::new(4, 4);
         assert!(manager.can_allocate(&seq));
         manager.allocate(&mut seq).unwrap();

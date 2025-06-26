@@ -9,7 +9,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use anyhow::{anyhow, Result};
 
-use crate::engine::optim::{compute_hash as hash_tokens, Sequence};
+use crate::engine::optim::compute_hash as hash_tokens;
+use crate::engine::sequence::Sequence;
 
 /// A single block of cached tokens.
 #[derive(Debug, Clone)]
