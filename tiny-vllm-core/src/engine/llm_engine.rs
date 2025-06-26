@@ -60,9 +60,12 @@ impl LlmEngine {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        prompts
+        let handles: Vec<_> = prompts
             .into_iter()
             .map(|p| self.queue.submit(p.into()))
+            .collect();
+        handles
+            .into_iter()
             .map(|h| h.wait())
             .flatten()
             .collect()
