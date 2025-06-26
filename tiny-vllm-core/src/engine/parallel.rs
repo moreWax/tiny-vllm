@@ -317,6 +317,7 @@ impl InferenceHandle {
 /// Thread-safe queue processing inference requests using a fixed set of workers.
 use crate::model::Model;
 
+#[derive(Debug)]
 pub struct InferenceQueue {
     sender: mpsc::Sender<(InferenceRequest, mpsc::Sender<String>)>,
     workers: Vec<thread::JoinHandle<()>>,
