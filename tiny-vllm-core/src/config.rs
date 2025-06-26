@@ -54,6 +54,46 @@ impl Default for VllmConfig {
     }
 }
 
+/// Configuration used by the [`ModelRunner`]. This is a small wrapper around
+/// [`VllmConfig`] with a couple of convenience builder methods used in tests.
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub device: String,
+    pub dtype: String,
+    pub kvcache_block_size: usize,
+    pub num_kvcache_blocks: Option<usize>,
+    pub enforce_eager: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            device: "cpu".to_string(),
+            dtype: "float32".to_string(),
+            kvcache_block_size: settings::KVCACHE_BLOCK_SIZE,
+            num_kvcache_blocks: None,
+            enforce_eager: settings::ENFORCE_EAGER,
+        }
+    }
+}
+
+impl Config {
+    pub fn with_device(mut self, dev: &str) -> Self {
+        self.device = dev.to_string();
+        self
+    }
+
+    pub fn with_dtype(mut self, dt: &str) -> Self {
+        self.dtype = dt.to_string();
+        self
+    }
+
+    pub fn with_max_num_seqs(self, _n: usize) -> Self {
+        // field not used in the simplified implementation
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
