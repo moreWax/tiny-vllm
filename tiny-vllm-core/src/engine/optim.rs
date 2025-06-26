@@ -77,6 +77,18 @@ impl Sequence {
         let end = usize::min(start + self.block_size, self.len());
         self.token_ids[start..end].to_vec()
     }
+
+    /// Borrow a block without allocation.
+    pub fn block_slice(&self, i: usize) -> &[i64] {
+        let start = i * self.block_size;
+        let end = usize::min(start + self.block_size, self.len());
+        &self.token_ids[start..end]
+    }
+
+    /// Iterate over blocks as slices.
+    pub fn blocks(&self) -> impl Iterator<Item = &[i64]> {
+        self.token_ids.chunks(self.block_size)
+    }
 }
 
 /// Block manager tracking free and used cache blocks.
