@@ -20,6 +20,8 @@ pub mod settings {
     pub const NUM_KVCACHE_BLOCKS: isize = -1;
     /// Default end-of-sequence token id.
     pub const EOS: i64 = -1;
+    /// Default number of worker threads for the engine.
+    pub const NUM_THREADS: usize = 1;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -35,6 +37,7 @@ pub struct VllmConfig {
     pub eos: i64,
     pub kvcache_block_size: usize,
     pub num_kvcache_blocks: isize,
+    pub num_threads: usize, // <-- Added thread count
 }
 
 impl Default for VllmConfig {
@@ -50,8 +53,17 @@ impl Default for VllmConfig {
             eos: settings::EOS,
             kvcache_block_size: settings::KVCACHE_BLOCK_SIZE,
             num_kvcache_blocks: settings::NUM_KVCACHE_BLOCKS,
+            num_threads: settings::NUM_THREADS, // <-- Default value
         }
     }
+}
+
+impl VllmConfig {
+    pub fn with_num_threads(mut self, n: usize) -> Self {
+        self.num_threads = n.max(1);
+        self
+    }
+    // (Optional: Add other builder methods if you want)
 }
 
 /// Configuration used by the [`ModelRunner`]. This is a small wrapper around
@@ -102,6 +114,7 @@ mod tests {
     fn test_serde_roundtrip() {
         let mut cfg = VllmConfig::default();
         cfg.model = "facebook/opt-125m".to_string();
+        cfg.num_threads = 4;
         let json = serde_json::to_string(&cfg).unwrap();
         let decoded: VllmConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(cfg, decoded);
