@@ -43,7 +43,7 @@ impl ModelRunner {
     pub fn new(config: &Config) -> Result<Self> {
         let device = Self::get_device(&config.device)?;
         let dtype = Self::get_dtype(&config.dtype)?;
-        let model_config = Qwen3Config::from_config(&Config::default());
+        let model_config = Qwen3Config::from_config(config);
         let model = Qwen3Model::new(model_config.clone(), 0, &device, dtype)?;
         let sampler = Sampler::new(&device);
         let (k, v) = Self::create_kv_cache(&model_config, config.num_kvcache_blocks.unwrap_or(1), config.kvcache_block_size, &device, dtype)?;
