@@ -4,24 +4,21 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-// Core tensor/types used by ModelRunner and models
 use candle_core::{DType, Device, Result, Tensor, D};
 use anyhow::Result as AnyResult;
 
-// Model imports (use correct model name)
-use crate::models::qwen3::{Qwen3ForCausalLM, Qwen3Config};
-// TODO: When LLaMa and other models are implemented, add imports here.
+// Only use the real model struct; do not define or use any stub Qwen3Config.
+use crate::models::qwen3::Qwen3ForCausalLM;
 
-// TODO: Uncomment and use these for full engine config/model type support:
-// use crate::utils::config::{Config, EngineConfig, ModelType};
-// use crate::utils::progress::{progress_worker, ProgressReporter};
-
-use crate::config::Config;
+// TODO: Uncomment and use these for full engine config/model type support when ready.
+use crate::utils::config::{Config, EngineConfig, ModelType};
+use crate::utils::progress::{progress_worker, ProgressReporter};
 
 use crate::engine::sequence::Sequence;
-use crate::layers::sampler::Sampler;
 use crate::utils::context::{Context, set_context};
+
 // TODO: use crate::models::layers::VarBuilderX (to be implemented in models/layers/mod.rs)
+// TODO: use attention_rs::InputMetaData (to be implemented in layers/attention.rs)
 
 #[derive(Debug)]
 pub enum Model {
@@ -33,40 +30,53 @@ pub enum Model {
 #[derive(Debug)]
 pub struct ModelRunner {
     model: Model,
-    sampler: Sampler,
     kv_cache: Arc<Mutex<Vec<(Tensor, Tensor)>>>,
     device: Device,
-    dtype: DType,
-    block_size: usize,
-    num_blocks: usize,
+    config: EngineCong,
 }
 
 impl ModelRunner {
-    // For simplicity, using Config. If you want EngineConfig, adjust accordingly.
-    pub async fn new(model_type: &str, config: &Config, dtype: DType, device: Device) -> Result<Self> {
+    pub async fn new(
+        model_type: ModelType,
+        vb: &VarBuilderX,
+        econfig: &EngineConfig,
+        config: &Config, 
+        dtype: DType,
+        is_rope_i: bool,
+        device: Device,
+    ) -> Result<Self> {
+        // TODO:
+        // implement ProgressReporter in utils/progress.rs
+        let reporter = Arc::new(RwLock::new(ProgressReporter::new(0)));
+        // TODO:
+        // implement progress_worker in utils/progress.rs
+        progress_worker(Some(1), config.num_hidden_layers, Arc::clone(&reporter));
         let model = match model_type {
-            "qwen3" => {
-                let model = Qwen3ForCausalLM::load(config, dtype, &device).await?;
-                Model::Qwen3(model)
+            ModelType::Qwen3 => {
+                let model = Model::Qwen3(Qwen3ForCausalLM::new(
+                    vb,
+                    config,
+                    dtype,
+                    is_rope_i,
+                    &device),
+                    Arc::clone(&reporter),
+                )?),                         
+            _ => { 
+                candle_core::bail!("Unsupported model type: {model_type}"),
             }
-            // "llama" => { ... }
-            // "onnx" => { ... }
-            _ => candle_core::bail!("Unsupported model type: {model_type}"),
         };
 
         let kv_cache = Self::init_kv_cache(config, dtype, &device)?;
-        let sampler = Sampler::new(&device);
 
         Ok(Self {
             model,
-            sampler,
             kv_cache: Arc::new(Mutex::new(kv_cache)),
             device,
-            dtype,
-            block_size: config.kvcache_block_size,
-            num_blocks: config.num_kvcache_blocks.unwrap_or(1),
+            config: econfig.clone(),
         })
     }
+
+    // Stopped Auditing here
 
     pub async fn load_weights(&self, weights_path: &std::path::Path) -> Result<()> {
         match &self.model {
@@ -101,7 +111,7 @@ impl ModelRunner {
     }
 
     fn init_kv_cache(config: &Config, dtype: DType, device: &Device) -> Result<Vec<(Tensor, Tensor)>> {
-        let num_blocks = config.num_kvcache_block_size.unwrap_or(1);
+        let num_blocks = config.num_kvcache_blocks.unwrap_or(1);
         let num_layers = config.num_hidden_layers;
         let num_heads = config.num_key_value_heads;
         let head_dim = config.head_dim();
@@ -116,7 +126,7 @@ impl ModelRunner {
     }
 
     fn prepare_prefill(&self, sequences: &[Sequence]) -> Result<(Tensor, Tensor, crate::utils::context::InputMetadata)> {
-        // TODO: Implement metadata logic based on runner.rs (slot mapping, cu_seqlens, etc.)
+        // TODO: Implement using InputMetaData from attention_rs when layers/attention.rs is ready.
         unimplemented!("Prefill preparation is not yet implemented")
     }
 
