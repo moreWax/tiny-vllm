@@ -180,7 +180,7 @@ impl BlockManager {
         let last_block = &mut self.blocks[last_id];
 
         match seq.len() % self.block_size {
-            1 if last_block.hash.is_some() => {
+            BLOCK_ALIGNMENT_REMAINDER if last_block.hash.is_some() => {
                 let new_id = self
                     .free_blocks
                     .pop_front()
