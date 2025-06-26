@@ -161,7 +161,7 @@ impl BlockManager {
 
     pub fn can_append(&self, seq: &Sequence) -> bool {
         match seq.len() % self.block_size {
-            1 => !self.free_blocks.is_empty(),
+            SEQUENCE_REMAINDER_FOR_APPEND => !self.free_blocks.is_empty(),
             _ => true,
         }
     }
