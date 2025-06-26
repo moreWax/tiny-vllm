@@ -425,7 +425,11 @@ impl BlockManager {
 
     pub fn can_append(&self, seq: &Sequence) -> bool {
         match seq.len() % self.block_size {
+
+            SEQUENCE_REMAINDER_FOR_APPEND => !self.free_blocks.is_empty(),
+
             1 => !self.free_blocks.is_empty(),
+
             _ => true,
         }
     }
@@ -444,7 +448,10 @@ impl BlockManager {
         let last_block = &mut self.blocks[last_id];
 
         match seq.len() % self.block_size {
+            BLOCK_ALIGNMENT_REMAINDER if last_block.hash.is_some() => {
+
             1 if last_block.hash.is_some() => {
+
                 let new_id = self
                     .free_blocks
                     .pop_front()
