@@ -15,7 +15,7 @@ use tiny_vllm_core::{config, cuda_utils, engine::parallel, network};
 use ndarray::{Array1, Array2};
 use numpy::{IntoPyArray, PyArray2};
 
-use tiny_vllm_core::engine::{parallel, session as session_core};
+use tiny_vllm_core::engine::{parallel);
 use tiny_vllm_core::model::{self, layers};
 use tiny_vllm_core::{config, cuda_utils, network};
 
@@ -297,46 +297,6 @@ impl Model {
     }
 }
 
-// ----- Session wrapper -----
-#[pyclass]
-struct Session {
-    inner: session_core::Session,
-}
-
-#[pymethods]
-impl Session {
-    #[new]
-    fn new(model: String) -> Self {
-        Self {
-            inner: session_core::Session::new(model),
-        }
-    }
-
-    #[getter]
-    fn id(&self) -> u64 {
-        self.inner.id()
-    }
-
-    #[getter]
-    fn model(&self) -> String {
-        self.inner.model().to_string()
-    }
-
-    fn reset(&mut self) {
-        self.inner.reset();
-    }
-}
-
-fn vec_to_array2(v: Vec<Vec<f32>>) -> Array2<f32> {
-    let rows = v.len();
-    let cols = v.get(0).map(|r| r.len()).unwrap_or(0);
-    Array2::from_shape_vec((rows, cols), v.into_iter().flatten().collect()).unwrap()
-}
-
-fn vec_to_array1(v: Vec<f32>) -> Array1<f32> {
-    Array1::from_vec(v)
-}
-
 // ----- Layer wrappers -----
 #[pyclass]
 struct LinearLayer {
@@ -500,8 +460,6 @@ fn tiny_vllm_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<LinearLayer>()?;
     m.add_class::<SiluAndMul>()?;
     m.add_class::<RMSNorm>()?;
-    m.add_class::<Session>()?;
-
     m.add_class::<Model>()?;
 
     Ok(())
